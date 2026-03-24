@@ -1,0 +1,139 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+  moduleFormat    = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+model User {
+  id          String    @id @default(uuid())
+  email       String    @unique
+  password    String
+  username    String    @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  messages    Message[]
+  chats       ChatParticipant[]
+
+  messageReads      MessageRead[]
+  typingIndicators  TypingIndicator[]
+  refreshTokens     RefreshToken[]
+
+  isOnline    Boolean   @default(false)
+  lastSeenAt  DateTime?
+
+  @@index([email])
+  @@index([username])
+}
+
+model Chat {
+  id            String            @id @default(uuid())
+  isGroup       Boolean           @default(false)
+  name          String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  participants  ChatParticipant[]
+  messages      Message[]
+
+  typingIndicators TypingIndicator[]
+
+  lastMessageId String?
+  lastMessage   Message?          @relation("LastMessage", fields: [lastMessageId], references: [id])
+
+  @@index([createdAt])
+}
+
+model ChatParticipant {
+  id        String   @id @default(uuid())
+  userId    String
+  chatId    String
+  joinedAt  DateTime @default(now())
+
+  isAdmin   Boolean  @default(false)
+
+  user      User     @relation(fields: [userId], references: [id])
+  chat      Chat     @relation(fields: [chatId], references: [id])
+
+  @@unique([userId, chatId])
+  @@index([chatId])
+  @@index([userId])
+}
+
+model Message {
+  id          String        @id @default(uuid())
+  content     String
+  senderId    String
+  chatId      String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  status      MessageStatus @default(SENT)
+
+  deletedAt   DateTime?
+
+  sender      User          @relation(fields: [senderId], references: [id])
+  chat        Chat          @relation(fields: [chatId], references: [id])
+
+  lastMessage Chat[]        @relation("LastMessage")
+
+  readBy      MessageRead[]
+
+  @@index([chatId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+model MessageRead {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+
+  message   Message  @relation(fields: [messageId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([messageId, userId])
+  @@index([userId])
+}
+
+model TypingIndicator {
+  id        String   @id @default(uuid())
+  userId    String
+  chatId    String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  chat      Chat     @relation(fields: [chatId], references: [id])
+
+  @@unique([userId, chatId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
